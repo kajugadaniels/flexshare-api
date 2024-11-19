@@ -1,4 +1,5 @@
 from account.models import *
+from django.db.models import Q
 from rest_framework import serializers
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
@@ -66,3 +67,11 @@ class UserSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email_or_phone = serializers.CharField()
+
+    def validate_email_or_phone(self, value):
+        if not User.objects.filter(Q(email=value) | Q(phone_number=value)).exists():
+            raise serializers.ValidationError('User with this email or phone number does not exist.')
+        return value
