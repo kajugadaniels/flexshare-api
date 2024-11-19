@@ -123,13 +123,32 @@ class UpdateUserView(generics.UpdateAPIView):
         partial = kwargs.pop('partial', True)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-
-        return Response({
-            "user": serializer.data,
-            "message": "Account updated successfully."
-        }, status=status.HTTP_200_OK)
+        if serializer.is_valid():
+            try:
+                user = serializer.save()
+                logger.info(f"User updated: {user.email or user.phone_number}")
+                return Response({
+                    "user": serializer.data,
+                    "message": "Account updated successfully."
+                }, status=status.HTTP_200_OK)
+            except ValidationError as ve:
+                logger.error(f"Validation error during user update: {ve}")
+                return Response({
+                    "message": "Account update failed.",
+                    "errors": ve.detail
+                }, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                logger.error(f"Unexpected error during user update: {e}")
+                return Response({
+                    "message": "Account update failed due to an unexpected error.",
+                    "errors": str(e)
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            logger.warning(f"User update failed with errors: {serializer.errors}")
+            return Response({
+                "message": "Account update failed.",
+                "errors": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 class PasswordResetRequestView(generics.GenericAPIView):
     serializer_class = PasswordResetRequestSerializer
