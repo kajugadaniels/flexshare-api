@@ -171,12 +171,9 @@ class PasswordResetConfirmView(generics.GenericAPIView):
     serializer_class = PasswordResetConfirmSerializer
     permission_classes = [permissions.AllowAny]
 
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            logger.info(f"Password reset successful for user: {user.email or user.phone_number}")
-            return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
-        else:
-            logger.warning(f"Password reset failed: {serializer.errors}")
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        logger.info(f"Password reset successful for user: {user.email or user.phone_number}")
+        return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
