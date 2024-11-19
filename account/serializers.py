@@ -56,6 +56,53 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.get_all_permissions()
         return []
 
+    def validate_email(self, value):
+        """
+        Validate that the email is unique.
+        """
+        if value:
+            if User.objects.filter(email=value).exists():
+                raise serializers.ValidationError("A user with this email already exists.")
+        return value
+
+    def validate_phone_number(self, value):
+        """
+        Validate that the phone number is unique and follows a specific format.
+        """
+        phone_regex = re.compile(r'^\+?1?\d{9,15}$')  # Example: +12345678901
+        if not phone_regex.match(value):
+            raise serializers.ValidationError("Phone number must be entered in the format: '+999999999'. Up to 15 digits allowed.")
+        if User.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError("A user with this phone number already exists.")
+        return value
+
+    def validate_national_id(self, value):
+        """
+        Validate that the national ID is unique and follows a specific format.
+        """
+        nid_regex = re.compile(r'^\d{10}$')  # Example: 10-digit number
+        if not nid_regex.match(value):
+            raise serializers.ValidationError("National ID must be a 10-digit number.")
+        if User.objects.filter(national_id=value).exists():
+            raise serializers.ValidationError("A user with this National ID already exists.")
+        return value
+
+    def validate_password(self, value):
+        """
+        Validate password strength.
+        """
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
+        if not re.search(r'[A-Z]', value):
+            raise serializers.ValidationError("Password must contain at least one uppercase letter.")
+        if not re.search(r'[a-z]', value):
+            raise serializers.ValidationError("Password must contain at least one lowercase letter.")
+        if not re.search(r'\d', value):
+            raise serializers.ValidationError("Password must contain at least one digit.")
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', value):
+            raise serializers.ValidationError("Password must contain at least one special character.")
+        return value
+
     def create(self, validated_data):
         """
         Create a new user with a hashed password and handle optional image upload.
