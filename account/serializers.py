@@ -100,15 +100,14 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
     def save(self):
         user = self.context['user']
-        validated_data = {'password': self.validated_data['password']}
-        # Use the UserSerializer to update the user's password
-        serializer = UserSerializer(user, data=validated_data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            # Clear the OTP fields
-            user.reset_otp = None
-            user.otp_created_at = None
-            user.save()
-            return user
-        else:
-            raise serializers.ValidationError(serializer.errors)
+        password = self.validated_data['password']
+
+        # Set the new password
+        user.set_password(password)
+
+        # Clear OTP fields
+        user.reset_otp = None
+        user.otp_created_at = None
+        user.save()
+
+        return user
