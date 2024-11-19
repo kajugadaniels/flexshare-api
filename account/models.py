@@ -11,6 +11,10 @@ def user_image_path(instance, filename):
     base_filename, file_extension = os.path.splitext(filename)
     return f'users/user_{slugify(instance.name)}_{instance.phone_number}_{instance.email}{file_extension}'
 
+def user_image_path(instance, filename):
+    base_filename, file_extension = os.path.splitext(filename)
+    return f'users/user_{slugify(instance.name)}_{instance.phone_number}_{instance.email}{file_extension}'
+
 class User(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = (
         ('Client', 'Client'),
