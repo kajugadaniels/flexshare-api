@@ -1,3 +1,4 @@
+import re
 from account.models import *
 from datetime import timedelta
 from django.db.models import Q
@@ -8,14 +9,30 @@ from django.core.exceptions import ValidationError
 class LoginSerializer(serializers.Serializer):
     identifier = serializers.CharField(required=True, write_only=True)
     password = serializers.CharField(write_only=True, required=True)
-
+    
     def validate_identifier(self, value):
-        try:
-            # Attempt to validate the value as an email
-            if "@" in value:  # Simplistic check to assume it's an email
-                validate_email(value)  # Will raise a ValidationError if invalid
-        except ValidationError as e:
-            raise serializers.ValidationError("Invalid email address") from e
+        """
+        Validate that the identifier is either a valid email or a valid phone number.
+        """
+        # Check if it's an email
+        if "@" in value:
+            try:
+                validate_email(value)
+            except ValidationError as e:
+                raise serializers.ValidationError("Invalid email address.") from e
+        else:
+            # Validate phone number (simple regex for demonstration)
+            phone_regex = re.compile(r'^\+?1?\d{9,15}$')
+            if not phone_regex.match(value):
+                raise serializers.ValidationError("Invalid phone number format.")
+        return value
+
+    def validate_password(self, value):
+        """
+        Add password validations if needed (e.g., minimum length).
+        """
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
         return value
 
 class UserSerializer(serializers.ModelSerializer):
