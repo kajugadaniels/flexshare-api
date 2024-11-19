@@ -18,33 +18,43 @@ class LoginView(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            # Log the serializer errors
+            logger.warning(f"Login failed due to serializer errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         identifier = serializer.validated_data['identifier']
         password = serializer.validated_data['password']
 
         # Determine if the identifier is an email or phone number
+        user = None
         if "@" in identifier:
             user = authenticate(username=identifier, password=password)
+            if not user:
+                logger.warning(f"Login failed for email: {identifier}")
         else:
-            # Try to authenticate with the phone number
             try:
                 user = User.objects.get(phone_number=identifier)
                 if not user.check_password(password):
                     user = None
+                    logger.warning(f"Login failed for phone number: {identifier} due to incorrect password.")
             except User.DoesNotExist:
-                user = None
+                logger.warning(f"Login failed: No user found with phone number: {identifier}")
 
         if user:
             # Delete old token and generate a new one
             Token.objects.filter(user=user).delete()
             token, created = Token.objects.get_or_create(user=user)
 
+            logger.info(f"User {user.email or user.phone_number} logged in successfully.")
+
             return Response({
                 'token': token.key,
                 'user': UserSerializer(user).data,
                 'message': 'Login successful.'
             }, status=status.HTTP_200_OK)
+        
+        # For security, do not specify if it's the identifier or password that's wrong
         return Response({'error': 'Invalid credentials.'}, status=status.HTTP_400_BAD_REQUEST)
 
 class RegisterView(generics.CreateAPIView):
