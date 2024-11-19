@@ -110,13 +110,14 @@ class PasswordResetRequestView(generics.GenericAPIView):
     serializer_class = PasswordResetRequestSerializer
     permission_classes = [permissions.AllowAny]
 
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email_or_phone = serializer.validated_data['email_or_phone']
         user = User.objects.filter(Q(email=email_or_phone) | Q(phone_number=email_or_phone)).first()
 
         if not user:
+            logger.warning(f"Password reset requested for non-existent identifier: {email_or_phone}")
             return Response(
                 {'error': 'User with this email or phone number does not exist.'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -142,6 +143,7 @@ class PasswordResetRequestView(generics.GenericAPIView):
                     status=status.HTTP_200_OK
                 )
             else:
+                logger.error(f"Failed to send OTP email to {user.email}")
                 return Response(
                     {'error': 'Failed to send OTP email. Please try again later.'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -157,11 +159,13 @@ class PasswordResetRequestView(generics.GenericAPIView):
                     status=status.HTTP_200_OK
                 )
             else:
+                logger.error(f"Failed to send OTP SMS to {user.phone_number}")
                 return Response(
                     {'error': 'Failed to send OTP SMS. Please try again later.'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
         else:
+            logger.warning(f"Provided contact information does not match for user ID: {user.id}")
             return Response(
                 {'error': 'Provided contact information does not match our records.'},
                 status=status.HTTP_400_BAD_REQUEST
