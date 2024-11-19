@@ -1,12 +1,15 @@
+import logging
+from account.models import *
+from django.db.models import Q
 from account.serializers import *
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
-from rest_framework.generics import GenericAPIView
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, permissions, status
-from rest_framework.permissions import IsAuthenticated, AllowAny
+
+logger = logging.getLogger(__name__)
 
 class LoginView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
@@ -101,3 +104,78 @@ class UpdateUserView(generics.UpdateAPIView):
             "user": serializer.data,
             "message": "Account updated successfully."
         }, status=status.HTTP_200_OK)
+
+class PasswordResetRequestView(generics.GenericAPIView):
+    serializer_class = PasswordResetRequestSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email_or_phone = serializer.validated_data['email_or_phone']
+        user = User.objects.filter(Q(email=email_or_phone) | Q(phone_number=email_or_phone)).first()
+
+        if not user:
+            return Response(
+                {'error': 'User with this email or phone number does not exist.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Generate a 7-digit OTP
+        otp = generate_otp()
+        user.reset_otp = otp
+        user.otp_created_at = timezone.now()
+        user.save()
+
+        # Send OTP via Email or SMS
+        if user.email and user.email == email_or_phone:
+            # Send Email
+            subject = 'Password Reset OTP'
+            message = f'Your password reset OTP is: {otp}'
+            recipient_list = [user.email]
+            email_sent = send_email(subject, message, recipient_list)
+            if email_sent:
+                logger.info(f"Password reset OTP sent to email: {user.email}")
+                return Response(
+                    {'message': 'OTP has been sent to your email.'},
+                    status=status.HTTP_200_OK
+                )
+            else:
+                return Response(
+                    {'error': 'Failed to send OTP email. Please try again later.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        elif user.phone_number and user.phone_number == email_or_phone:
+            # Send SMS
+            message = f'Your password reset OTP is: {otp}'
+            sms_sent = send_sms(user.phone_number, message)
+            if sms_sent:
+                logger.info(f"Password reset OTP sent to phone number: {user.phone_number}")
+                return Response(
+                    {'message': 'OTP has been sent to your phone number.'},
+                    status=status.HTTP_200_OK
+                )
+            else:
+                return Response(
+                    {'error': 'Failed to send OTP SMS. Please try again later.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        else:
+            return Response(
+                {'error': 'Provided contact information does not match our records.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+class PasswordResetConfirmView(generics.GenericAPIView):
+    serializer_class = PasswordResetConfirmSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            logger.info(f"Password reset successful for user: {user.email or user.phone_number}")
+            return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+        else:
+            logger.warning(f"Password reset failed: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
