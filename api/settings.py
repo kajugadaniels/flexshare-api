@@ -200,3 +200,5 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 # DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Your App <no-reply@yourapp.com>')
+
+GOOGLE_CLIENT_ID = '165505940635-oda6u8kfjnsgnit4gqfrvpekdd15aqo7.apps.googleusercontent.com'

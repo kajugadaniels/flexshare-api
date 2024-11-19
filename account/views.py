@@ -3,12 +3,14 @@ from account.utils import *
 from account.models import *
 from django.db.models import Q
 from account.serializers import *
+from google.oauth2 import id_token
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, permissions, status
+from google.auth.transport import requests as google_requests
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +58,53 @@ class LoginView(generics.GenericAPIView):
         
         # For security, do not specify if it's the identifier or password that's wrong
         return Response({'error': 'Invalid credentials.'}, status=status.HTTP_400_BAD_REQUEST)
+
+class GoogleAuthView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        token = request.data.get('token')
+        if not token:
+            return Response({'message': 'Token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            # Specify the CLIENT_ID of the app that accesses the backend:
+            idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), GOOGLE_CLIENT_ID)
+
+            # ID token is valid. Get the user's Google Account ID from the decoded token.
+            userid = idinfo['sub']
+            email = idinfo.get('email')
+            name = idinfo.get('name')
+
+            # Check if user exists
+            try:
+                user = User.objects.get(email=email)
+                # Update Google ID if necessary
+                user.google_id = userid
+                user.save()
+            except User.DoesNotExist:
+                # Create a new user
+                user = User.objects.create_user(
+                    name=name,
+                    email=email,
+                    google_id=userid,
+                    password=User.objects.make_random_password()  # Generate a random password
+                )
+
+            # Create or get token
+            token_obj, created = Token.objects.get_or_create(user=user)
+
+            logger.info(f"User {user.email} authenticated via Google.")
+
+            return Response({
+                'user': UserSerializer(user).data,
+                'token': token_obj.key,
+                'message': 'Google authentication successful.'
+            }, status=status.HTTP_200_OK)
+
+        except ValueError:
+            # Invalid token
+            logger.error('Invalid Google token.')
+            return Response({'message': 'Invalid token.'}, status=status.HTTP_400_BAD_REQUEST)
 
 class RegisterView(generics.CreateAPIView):
     """

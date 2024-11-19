@@ -7,6 +7,7 @@ app_name = 'auth'
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
+    path('auth/google/', GoogleAuthView.as_view(), name='google-auth'),
     path('register/', RegisterView.as_view(), name='register'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('update-account/', UpdateUserView.as_view(), name='updateAccount'),
