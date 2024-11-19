@@ -66,3 +66,18 @@ class RegisterView(generics.CreateAPIView):
                 "message": "User registration failed.",
                 "errors": serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            if hasattr(request.user, 'auth_token'):
+                request.user.auth_token.delete()
+            return Response({
+                "message": "Logout successful."
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                "error": f"An error occurred during logout: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
