@@ -17,8 +17,8 @@ def send_email(subject, message, recipient_list):
         send_mail(subject, message, from_email, recipient_list)
         return True
     except Exception as e:
-        # Log the exception
-        print(f"Failed to send email: {e}")
+        # Log the exception with detailed information
+        logger.error(f"Failed to send email to {recipient_list}: {e}", exc_info=True)
         return False
 
 def send_sms(phone_number, message):
@@ -32,6 +32,6 @@ def send_sms(phone_number, message):
         )
         return True
     except Exception as e:
-        # Log the exception
-        print(f"Failed to send SMS: {e}")
+        # Log the exception with detailed information
+        logger.error(f"Failed to send SMS to {phone_number}: {e}", exc_info=True)
         return False
