@@ -1,4 +1,5 @@
 from account.models import *
+from datetime import timedelta
 from django.db.models import Q
 from rest_framework import serializers
 from django.core.validators import validate_email
@@ -75,3 +76,39 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         if not User.objects.filter(Q(email=value) | Q(phone_number=value)).exists():
             raise serializers.ValidationError('User with this email or phone number does not exist.')
         return value
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    email_or_phone = serializers.CharField()
+    otp = serializers.CharField(max_length=7)
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        email_or_phone = attrs.get('email_or_phone')
+        otp = attrs.get('otp')
+
+        try:
+            user = User.objects.get(
+                Q(email=email_or_phone) | Q(phone_number=email_or_phone),
+                reset_otp=otp,
+                otp_created_at__gte=timezone.now() - timedelta(minutes=10)
+            )
+        except User.DoesNotExist:
+            raise serializers.ValidationError('Invalid OTP or OTP has expired.')
+
+        self.context['user'] = user
+        return attrs
+
+    def save(self):
+        user = self.context['user']
+        validated_data = {'password': self.validated_data['password']}
+        # Use the UserSerializer to update the user's password
+        serializer = UserSerializer(user, data=validated_data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            # Clear the OTP fields
+            user.reset_otp = None
+            user.otp_created_at = None
+            user.save()
+            return user
+        else:
+            raise serializers.ValidationError(serializer.errors)
