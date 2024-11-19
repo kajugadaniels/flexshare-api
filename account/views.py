@@ -156,64 +156,67 @@ class PasswordResetRequestView(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        email_or_phone = serializer.validated_data['email_or_phone']
-        user = User.objects.filter(Q(email=email_or_phone) | Q(phone_number=email_or_phone)).first()
+        if serializer.is_valid():
+            email_or_phone = serializer.validated_data['email_or_phone']
+            user = User.objects.filter(Q(email=email_or_phone) | Q(phone_number=email_or_phone)).first()
 
-        if not user:
-            logger.warning(f"Password reset requested for non-existent identifier: {email_or_phone}")
-            return Response(
-                {'error': 'User with this email or phone number does not exist.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Generate a 7-digit OTP
-        otp = generate_otp()
-        user.reset_otp = otp
-        user.otp_created_at = timezone.now()
-        user.save()
-
-        # Send OTP via Email or SMS
-        if user.email and user.email == email_or_phone:
-            # Send Email
-            subject = 'Password Reset OTP'
-            message = f'Your password reset OTP is: {otp}'
-            recipient_list = [user.email]
-            email_sent = send_email(subject, message, recipient_list)
-            if email_sent:
-                logger.info(f"Password reset OTP sent to email: {user.email}")
+            if not user:
+                logger.warning(f"Password reset requested for non-existent identifier: {email_or_phone}")
                 return Response(
-                    {'message': 'OTP has been sent to your email.'},
-                    status=status.HTTP_200_OK
+                    {'error': 'User with this email or phone number does not exist.'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
+
+            # Generate a 7-digit OTP
+            otp = generate_otp()
+            user.reset_otp = otp
+            user.otp_created_at = timezone.now()
+            user.save()
+
+            # Send OTP via Email or SMS
+            if user.email and user.email == email_or_phone:
+                # Send Email
+                subject = 'Password Reset OTP'
+                message = f'Your password reset OTP is: {otp}'
+                recipient_list = [user.email]
+                email_sent = send_email(subject, message, recipient_list)
+                if email_sent:
+                    logger.info(f"Password reset OTP sent to email: {user.email}")
+                    return Response(
+                        {'message': 'OTP has been sent to your email.'},
+                        status=status.HTTP_200_OK
+                    )
+                else:
+                    logger.error(f"Failed to send OTP email to {user.email}")
+                    return Response(
+                        {'error': 'Failed to send OTP email. Please try again later.'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+            elif user.phone_number and user.phone_number == email_or_phone:
+                # Send SMS
+                message = f'Your password reset OTP is: {otp}'
+                sms_sent = send_sms(user.phone_number, message)
+                if sms_sent:
+                    logger.info(f"Password reset OTP sent to phone number: {user.phone_number}")
+                    return Response(
+                        {'message': 'OTP has been sent to your phone number.'},
+                        status=status.HTTP_200_OK
+                    )
+                else:
+                    logger.error(f"Failed to send OTP SMS to {user.phone_number}")
+                    return Response(
+                        {'error': 'Failed to send OTP SMS. Please try again later.'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
             else:
-                logger.error(f"Failed to send OTP email to {user.email}")
+                logger.warning(f"Provided contact information does not match for user ID: {user.id}")
                 return Response(
-                    {'error': 'Failed to send OTP email. Please try again later.'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-        elif user.phone_number and user.phone_number == email_or_phone:
-            # Send SMS
-            message = f'Your password reset OTP is: {otp}'
-            sms_sent = send_sms(user.phone_number, message)
-            if sms_sent:
-                logger.info(f"Password reset OTP sent to phone number: {user.phone_number}")
-                return Response(
-                    {'message': 'OTP has been sent to your phone number.'},
-                    status=status.HTTP_200_OK
-                )
-            else:
-                logger.error(f"Failed to send OTP SMS to {user.phone_number}")
-                return Response(
-                    {'error': 'Failed to send OTP SMS. Please try again later.'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    {'error': 'Provided contact information does not match our records.'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
         else:
-            logger.warning(f"Provided contact information does not match for user ID: {user.id}")
-            return Response(
-                {'error': 'Provided contact information does not match our records.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning(f"Password reset request failed with errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class PasswordResetConfirmView(generics.GenericAPIView):
     serializer_class = PasswordResetConfirmSerializer
