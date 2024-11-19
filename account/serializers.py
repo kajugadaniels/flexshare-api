@@ -162,6 +162,45 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     otp = serializers.CharField(max_length=7)
     password = serializers.CharField(write_only=True)
 
+    def validate_email_or_phone(self, value):
+        """
+        Validate that the identifier is either a valid email or phone number.
+        """
+        if "@" in value:
+            try:
+                validate_email(value)
+            except ValidationError:
+                raise serializers.ValidationError("Invalid email address.")
+        else:
+            phone_regex = re.compile(r'^\+?1?\d{9,15}$')
+            if not phone_regex.match(value):
+                raise serializers.ValidationError("Invalid phone number format.")
+        return value
+
+    def validate_otp(self, value):
+        """
+        Validate OTP format (assuming it's a 7-digit numeric code).
+        """
+        if not value.isdigit() or len(value) != 7:
+            raise serializers.ValidationError("OTP must be a 7-digit number.")
+        return value
+
+    def validate_password(self, value):
+        """
+        Validate password strength.
+        """
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
+        if not re.search(r'[A-Z]', value):
+            raise serializers.ValidationError("Password must contain at least one uppercase letter.")
+        if not re.search(r'[a-z]', value):
+            raise serializers.ValidationError("Password must contain at least one lowercase letter.")
+        if not re.search(r'\d', value):
+            raise serializers.ValidationError("Password must contain at least one digit.")
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', value):
+            raise serializers.ValidationError("Password must contain at least one special character.")
+        return value
+
     def validate(self, attrs):
         email_or_phone = attrs.get('email_or_phone')
         otp = attrs.get('otp')
