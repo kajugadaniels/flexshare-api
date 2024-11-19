@@ -1,8 +1,12 @@
 import os
 from pathlib import Path
+from os import getenv
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Load environment variables from the .env file
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 
 # Quick-start development settings - unsuitable for production
@@ -14,7 +18,7 @@ SECRET_KEY = 'django-insecure-clfmg)k07jt_9z$9fonh)fx^yo99n8rg8)l0*efm_4=2j0=yqt
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -33,6 +37,7 @@ INSTALLED_APPS = [
     'corsheaders',
     "whitenoise.runserver_nostatic",
     'drf_yasg',
+    'django_rest_passwordreset',
 
     # Custom apps
     'account',
