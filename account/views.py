@@ -224,7 +224,23 @@ class PasswordResetConfirmView(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        logger.info(f"Password reset successful for user: {user.email or user.phone_number}")
-        return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+        if serializer.is_valid():
+            try:
+                user = serializer.save()
+                logger.info(f"Password reset successful for user: {user.email or user.phone_number}")
+                return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+            except ValidationError as ve:
+                logger.error(f"Validation error during password reset confirmation: {ve}")
+                return Response({
+                    "message": "Password reset failed.",
+                    "errors": ve.detail
+                }, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                logger.error(f"Unexpected error during password reset confirmation: {e}")
+                return Response({
+                    "message": "Password reset failed due to an unexpected error.",
+                    "errors": str(e)
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            logger.warning(f"Password reset confirmation failed with errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
