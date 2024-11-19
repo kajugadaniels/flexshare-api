@@ -1,15 +1,19 @@
 from account.models import *
 from rest_framework import serializers
-from django.contrib.auth.models import Permission
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 
 class LoginSerializer(serializers.Serializer):
     identifier = serializers.CharField(required=True, write_only=True)
     password = serializers.CharField(write_only=True, required=True)
 
     def validate_identifier(self, value):
-        # Validate that the identifier is either a valid email or phone number
-        if "@" in value:  # Simplistic check to assume it's an email
-            serializers.EmailField().validate(value)  # Will raise a validation error if invalid
+        try:
+            # Attempt to validate the value as an email
+            if "@" in value:  # Simplistic check to assume it's an email
+                validate_email(value)  # Will raise a ValidationError if invalid
+        except ValidationError as e:
+            raise serializers.ValidationError("Invalid email address") from e
         return value
 
 class UserSerializer(serializers.ModelSerializer):
