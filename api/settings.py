@@ -32,16 +32,26 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # Third party
-    'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
     "whitenoise.runserver_nostatic",
     'drf_yasg',
     'django_rest_passwordreset',
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',  # For Google authentication
+    'allauth.socialaccount.providers.facebook',  # For Facebook authentication
+    'rest_framework',
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
 
     # Custom apps
     'account',
 ]
+
+SITE_ID = 1
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -158,14 +168,29 @@ AUTH_USER_MODEL = 'account.User'
 CORS_ALLOW_ALL_ORIGINS = True
 APPEND_SLASH = False
 
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+# Allauth Configuration
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+
+# Redirect URLs
+LOGIN_REDIRECT_URL = '/dashboard/'
+LOGOUT_REDIRECT_URL = '/login/'
 
 # CSRF_TRUSTED_ORIGINS = ['','https://*.127.0.0.1']
 
