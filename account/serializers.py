@@ -3,8 +3,14 @@ from rest_framework import serializers
 from django.contrib.auth.models import Permission
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
+    identifier = serializers.CharField(required=True, write_only=True)
     password = serializers.CharField(write_only=True, required=True)
+
+    def validate_identifier(self, value):
+        # Validate that the identifier is either a valid email or phone number
+        if "@" in value:  # Simplistic check to assume it's an email
+            serializers.EmailField().validate(value)  # Will raise a validation error if invalid
+        return value
 
 class UserSerializer(serializers.ModelSerializer):
     user_permissions = serializers.SerializerMethodField()
