@@ -67,15 +67,30 @@ class RegisterView(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            user = serializer.save()
-            token, created = Token.objects.get_or_create(user=user)
-            return Response({
-                "user": UserSerializer(user, context=self.get_serializer_context()).data,
-                "token": token.key,
-                "message": "User registered successfully."
-            }, status=status.HTTP_201_CREATED)
+        if serializer.is_valid():
+            try:
+                user = serializer.save()
+                token, created = Token.objects.get_or_create(user=user)
+                logger.info(f"New user registered: {user.email or user.phone_number}")
+                return Response({
+                    "user": UserSerializer(user, context=self.get_serializer_context()).data,
+                    "token": token.key,
+                    "message": "User registered successfully."
+                }, status=status.HTTP_201_CREATED)
+            except ValidationError as ve:
+                logger.error(f"Validation error during user registration: {ve}")
+                return Response({
+                    "message": "User registration failed.",
+                    "errors": ve.detail
+                }, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                logger.error(f"Unexpected error during user registration: {e}")
+                return Response({
+                    "message": "User registration failed due to an unexpected error.",
+                    "errors": str(e)
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:
+            logger.warning(f"User registration failed with errors: {serializer.errors}")
             return Response({
                 "message": "User registration failed.",
                 "errors": serializer.errors
